@@ -8,29 +8,6 @@ import { loadAndRegisterAPIRoutes } from "#api/primitives/openapi.ts";
 import { appRouter } from "#api/trpc/index.ts";
 
 /**
- * Raw body middleware for webhook signature verification.
- */
-function rawBodyMiddleware(
-	req: express.Request,
-	res: express.Response,
-	next: express.NextFunction,
-) {
-	if (req.url.includes("/webhooks/")) {
-		let data = "";
-		req.setEncoding("utf8");
-		req.on("data", (chunk: string) => {
-			data += chunk;
-		});
-		req.on("end", () => {
-			(req as any).rawBody = Buffer.from(data);
-			next();
-		});
-	} else {
-		next();
-	}
-}
-
-/**
  * Create and start the Express server with all middleware and routes.
  */
 export async function createServer(container: Container): Promise<void> {
@@ -39,8 +16,23 @@ export async function createServer(container: Container): Promise<void> {
 	app.locals.container = container;
 	app.set("trust proxy", true);
 	app
-		.use(rawBodyMiddleware)
-		.use(express.json({ limit: "1mb" }))
+		.use((req, res, next) => {
+			if (!req.url?.includes("/webhooks/")) {
+				return express.json({ limit: "1mb" })(req, res, next);
+			}
+			const chunks: Buffer[] = [];
+			req.on("data", (chunk: Buffer) => chunks.push(chunk));
+			req.on("end", () => {
+				const raw = Buffer.concat(chunks);
+				(req as any).rawBody = raw;
+				try {
+					req.body = JSON.parse(raw.toString());
+				} catch {
+					req.body = {};
+				}
+				next();
+			});
+		})
 		.use((req, res, next) => {
 			const origin = req.headers.origin;
 			if (origin === container.config.DASHBOARD_URL) {

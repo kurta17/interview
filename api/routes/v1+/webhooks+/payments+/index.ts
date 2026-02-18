@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { verifyWebhookSignature } from "#api/lib/webhooks/verify.ts";
 import {
 	defineOpenAPI,
 	defineOpenAPIEndpoint,
 } from "#api/primitives/openapi.ts";
+import { getPaymentById, updatePaymentStatus } from "#api/services/payments.ts";
 
 const WebhookEventSchema = z.object({
 	id: z.string(),
@@ -32,6 +34,35 @@ export default defineOpenAPI({
 			},
 		},
 		async handler({ ctx, body, request, response }) {
+			// Verify webhook signature.
+			// rawBody is attached by the raw body middleware in server.ts but isn't
+			// part of the Express Request type, so we cast to access it.
+			const isValid = verifyWebhookSignature(
+				(request as unknown as { rawBody: Buffer }).rawBody,
+				request.headers["x-webhook-signature"] as string | undefined,
+				ctx.container.config.WEBHOOK_SECRET,
+			);
+			if (!isValid) {
+				return response.unauthorized({ error: "Invalid signature" });
+			}
+
+			// Idempotency — skip if already processed
+			const existing = await getPaymentById(ctx, body.data.paymentId);
+			if (!existing) {
+				return response.ok({ received: true });
+			}
+			if (existing.lastWebhookId === body.id) {
+				return response.ok({ received: true });
+			}
+
+			// Update status
+			await updatePaymentStatus(
+				ctx,
+				body.data.paymentId,
+				body.data.newStatus,
+				body.id,
+			);
+
 			return response.ok({ received: true });
 		},
 	}),
