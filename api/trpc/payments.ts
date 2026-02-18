@@ -1,6 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getPaymentById } from "#api/services/payments.ts";
+import {
+	createPayment,
+	getPaymentById,
+	listPayments,
+} from "#api/services/payments.ts";
 import { protectedProcedure, router } from "./init.ts";
 
 /**
@@ -33,4 +37,26 @@ export const paymentsRouter = router({
 
 			return payment;
 		}),
+
+	/**
+	 * Create a new payment. Amount is in cents, assigned to the authenticated user.
+	 */
+	create: protectedProcedure
+		.input(
+			z.object({
+				amount: z.number().int().positive(),
+				recipientEmail: z.string().email(),
+				description: z.string().optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			return createPayment(ctx, { ...input, createdBy: ctx.user.id });
+		}),
+
+	/**
+	 * List all payments for the authenticated user, newest first.
+	 */
+	list: protectedProcedure.query(async ({ ctx }) => {
+		return listPayments(ctx, ctx.user.id);
+	}),
 });
