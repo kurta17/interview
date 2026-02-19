@@ -13,6 +13,14 @@ export const schema = z.object({
 	DASHBOARD_URL: z.string().default("http://localhost:3000"),
 	API_URL: z.string().default("http://localhost:3001"),
 	WEBHOOK_SECRET: z.string().default("whsec_test_secret_for_development"),
+
+	// Provider API keys — each provider needs its own credentials.
+	// Defaults are test/dummy values for local development only.
+	STRIPE_SECRET_KEY: z.string().default("sk_test_dummy_key_for_development"),
+	STRIPE_WEBHOOK_SECRET: z.string().default("whsec_stripe_test_secret"),
+	ADYEN_API_KEY: z.string().default("adyen_test_dummy_key_for_development"),
+	ADYEN_HMAC_KEY: z.string().default("adyen_test_hmac_key"),
+	ADYEN_MERCHANT_ACCOUNT: z.string().default("TestMerchantAccount"),
 });
 
 /**
