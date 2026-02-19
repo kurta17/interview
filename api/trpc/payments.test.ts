@@ -1,46 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { describe, expect } from "vitest";
-import { payments, users } from "#api/databases/schema.ts";
+import { users } from "#api/databases/schema.ts";
 import {
+	createTestPayment,
+	createTestUser,
 	defineTestAppContext,
-	type MockContainer,
 	serverTest,
 } from "#api/lib/testing/utils.ts";
 import type { AppContext } from "#api/primitives/app-context.ts";
 import { getPaymentById } from "#api/services/payments.ts";
-
-/**
- * Helper to create a user in the test database.
- */
-async function createUser(db: MockContainer["db"]) {
-	const [user] = await db
-		.insert(users)
-		.values({ email: "test@example.com", name: "Test User" })
-		.returning();
-	return user;
-}
-
-/**
- * Helper to create a payment.
- */
-async function createPayment(
-	db: MockContainer["db"],
-	userId: string,
-	overrides: Partial<typeof payments.$inferInsert> = {},
-) {
-	const [payment] = await db
-		.insert(payments)
-		.values({
-			amount: 1000,
-			currency: "USD",
-			recipientEmail: "recipient@example.com",
-			createdBy: userId,
-			...overrides,
-		})
-		.returning();
-
-	return payment;
-}
 
 /**
  * Simulates TRPC getById procedure logic for testing.
@@ -73,8 +41,8 @@ describe("payments.getById", () => {
 	serverTest(
 		"should return payment for authenticated owner",
 		async ({ container }) => {
-			const user = await createUser(container.db);
-			const payment = await createPayment(container.db, user.id, {
+			const user = await createTestUser(container.db);
+			const payment = await createTestPayment(container.db, user.id, {
 				amount: 2500,
 				description: "TRPC test payment",
 			});
@@ -112,8 +80,8 @@ describe("payments.getById", () => {
 	);
 
 	serverTest("should throw NOT_FOUND for non-owner", async ({ container }) => {
-		const owner = await createUser(container.db);
-		const payment = await createPayment(container.db, owner.id);
+		const owner = await createTestUser(container.db);
+		const payment = await createTestPayment(container.db, owner.id);
 		const [otherUser] = await container.db
 			.insert(users)
 			.values({ email: "other@example.com", name: "Other User" })
@@ -162,7 +130,7 @@ describe("payments.getById", () => {
 	serverTest(
 		"should throw NOT_FOUND for non-existent payment",
 		async ({ container }) => {
-			const user = await createUser(container.db);
+			const user = await createTestUser(container.db);
 			const ctx = defineTestAppContext(container, {
 				session: {
 					id: "session-id",

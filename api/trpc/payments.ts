@@ -45,6 +45,7 @@ export const paymentsRouter = router({
 		.input(
 			z.object({
 				amount: z.number().int().positive(),
+				currency: z.enum(["USD", "SGD"]).default("USD"),
 				recipientEmail: z.string().email(),
 				description: z.string().optional(),
 			}),

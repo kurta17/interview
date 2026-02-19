@@ -3,11 +3,14 @@ import { test } from "vitest";
 import { mock } from "vitest-mock-extended";
 import { relations } from "#api/databases/relations.ts";
 import * as schema from "#api/databases/schema.ts";
+import { payments, users } from "#api/databases/schema.ts";
 import type { AppContext } from "#api/primitives/app-context.ts";
 import { defineAuth } from "#api/primitives/auth.ts";
 import { defineConfig } from "#api/primitives/config.ts";
 import { defineTestDatabase } from "#api/primitives/database.ts";
 import type { Logger } from "#api/primitives/logger.ts";
+import { PaymentRouter } from "#api/providers/router.ts";
+import type { PaymentProvider } from "#api/providers/types.ts";
 
 /**
  * The mock container type.
@@ -50,6 +53,7 @@ export async function defineMockContainer() {
 			config,
 			db,
 			logger,
+			paymentRouter: new PaymentRouter([]),
 		},
 		cleanUp: async () => {
 			await dbCleanUp();
@@ -123,4 +127,86 @@ export function defineTestAppContext(
 		session: overrides.session ?? null,
 		user: overrides.user ?? null,
 	};
+}
+
+/**
+ * Creates a test user in the database.
+ */
+export async function createTestUser(
+	db: MockContainer["db"],
+	overrides: Partial<typeof users.$inferInsert> = {},
+) {
+	const [user] = await db
+		.insert(users)
+		.values({
+			email: "test@example.com",
+			name: "Test User",
+			...overrides,
+		})
+		.returning();
+	return user;
+}
+
+/**
+ * Creates a test payment directly in the database.
+ */
+export async function createTestPayment(
+	db: MockContainer["db"],
+	userId: string,
+	overrides: Partial<typeof payments.$inferInsert> = {},
+) {
+	const [payment] = await db
+		.insert(payments)
+		.values({
+			amount: 1000,
+			currency: "USD",
+			recipientEmail: "recipient@example.com",
+			createdBy: userId,
+			...overrides,
+		})
+		.returning();
+	return payment;
+}
+
+/**
+ * Creates a fake payment provider for testing.
+ *
+ * Instead of calling real Stripe/Adyen in tests, you create fake
+ * providers that implement the same interface and return controlled
+ * responses.
+ */
+export function fakeProvider(
+	overrides: Partial<PaymentProvider> & {
+		name: string;
+		supportedCurrencies: string[];
+	},
+): PaymentProvider {
+	return {
+		createPayment: async () => ({
+			providerPaymentId: "fake_provider_id_123",
+			status: "processing" as const,
+			rawResponse: { fake: true },
+		}),
+		verifyWebhook: () => true,
+		...overrides,
+	};
+}
+
+/**
+ * Creates an AppContext with a custom PaymentRouter.
+ *
+ * This lets each test inject different provider behaviors
+ * (success, failure, specific currencies) without changing
+ * the real container.
+ */
+export function ctxWithRouter(
+	container: MockContainer,
+	providers: PaymentProvider[],
+): AppContext {
+	const ctx = defineTestAppContext(container);
+	ctx.container = {
+		...ctx.container,
+		paymentRouter: new PaymentRouter(providers),
+	};
+	return ctx;
 }
