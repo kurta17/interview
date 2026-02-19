@@ -14,6 +14,7 @@ export default function PaymentsPage() {
 	});
 
 	const [amount, setAmount] = useState("");
+	const [currency, setCurrency] = useState<"USD" | "SGD">("USD");
 	const [recipientEmail, setRecipientEmail] = useState("");
 	const [description, setDescription] = useState("");
 
@@ -21,10 +22,12 @@ export default function PaymentsPage() {
 		e.preventDefault();
 		createMutation.mutate({
 			amount: Math.round(parseFloat(amount) * 100),
+			currency,
 			recipientEmail,
 			description: description || undefined,
 		});
 		setAmount("");
+		setCurrency("USD");
 		setRecipientEmail("");
 		setDescription("");
 	};
@@ -50,23 +53,46 @@ export default function PaymentsPage() {
 					)}
 
 					<div>
-						<label
-							htmlFor="amount"
-							className="block text-sm font-medium text-gray-700"
-						>
-							Amount (USD)
-						</label>
-						<input
-							id="amount"
-							type="number"
-							min="0.01"
-							step="0.01"
-							required
-							placeholder="0.00"
-							value={amount}
-							onChange={(e) => setAmount(e.target.value)}
-							className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-						/>
+						<div className="flex gap-4">
+							<div className="flex-1">
+								<label
+									htmlFor="amount"
+									className="block text-sm font-medium text-gray-700"
+								>
+									Amount
+								</label>
+								<input
+									id="amount"
+									type="number"
+									min="0.01"
+									step="0.01"
+									required
+									placeholder="0.00"
+									value={amount}
+									onChange={(e) => setAmount(e.target.value)}
+									className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+								/>
+							</div>
+							<div className="w-28">
+								<label
+									htmlFor="currency"
+									className="block text-sm font-medium text-gray-700"
+								>
+									Currency
+								</label>
+								<select
+									id="currency"
+									value={currency}
+									onChange={(e) =>
+										setCurrency(e.target.value as "USD" | "SGD")
+									}
+									className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+								>
+									<option value="USD">USD</option>
+									<option value="SGD">SGD</option>
+								</select>
+							</div>
+						</div>
 					</div>
 
 					<div>
@@ -157,7 +183,8 @@ export default function PaymentsPage() {
 											{payment.description ?? "—"}
 										</td>
 										<td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
-											${(payment.amount / 100).toFixed(2)}
+											{(payment.amount / 100).toFixed(2)}{" "}
+											{payment.currency}
 										</td>
 										<td className="whitespace-nowrap px-4 py-3 text-sm">
 											<span
